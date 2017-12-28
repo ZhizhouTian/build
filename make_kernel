@@ -1,0 +1,19 @@
+#!/bin/bash
+set -x
+
+WORKDIR=$(pwd)
+KERNEL_DIR=$WORKDIR/../kernel-stable
+ARCH=x86_64
+
+if [ ! -d $KERNEL_DIR ]; then
+	echo "$KERNEL_DIR not exists"
+	exit
+fi
+
+mkdir -p $WORKDIR/out
+
+if [ ! -f $WORKDIR/out/.config ]; then
+	cp $WORKDIR/configs/x86_64_3.18.y_defconfig $WORKDIR/out/.config
+fi
+
+make ARCH=$ARCH -C $KERNEL_DIR O=$WORKDIR/out $* -j4
