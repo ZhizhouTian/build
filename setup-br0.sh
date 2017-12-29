@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 
 sudo ip link add br0 type bridge
 sudo ip link set br0 up
