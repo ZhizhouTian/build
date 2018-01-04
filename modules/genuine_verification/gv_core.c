@@ -13,7 +13,7 @@ static struct list_head g_match_algorithm_head;
 spinlock_t match_algorithm_lock;
 
 #define MAX_IKVERSION_LEN 32
-char g_ikversion[MAX_IKVERSION_LEN];
+#define MAX_SN_LEN 20
 
 static atomic_t g_is_genuine;
 static atomic_t g_is_validating;
@@ -42,7 +42,29 @@ static uint64_t generate_machine_code(void)
 	return mc.machine_code;
 }
 
-static bool genuine_verification(char *ikversion, uint64_t serial_number)
+struct timer_list g_punishment_timer;
+
+static void punishment(unsigned long data)
+{
+	panic("盗版重启");
+}
+
+void start_punishment(void)
+{
+	pr_emerg("开启防盗版惩罚，五小时后重启.\n");
+	init_timer(&g_punishment_timer);
+	g_punishment_timer.expires = jiffies + HZ*60*60*5;
+	g_punishment_timer.function = punishment;
+	add_timer(&g_punishment_timer);
+}
+
+void cancel_punishment(void)
+{
+	pr_emerg("正版验证成功，停止盗版惩罚.\n");
+	del_timer_sync(&g_punishment_timer);
+}
+
+static bool genuine_verification(char *ikversion, char *sn)
 {
 	struct match_algorithm *ma;
 	uint64_t mc;
@@ -52,7 +74,7 @@ static bool genuine_verification(char *ikversion, uint64_t serial_number)
 	spin_lock_bh(&match_algorithm_lock);
 	list_for_each_entry(ma, &g_match_algorithm_head, next) {
 		if (0 == strncmp(ikversion, ma->ikversion, sizeof(ma->ikversion)))
-			ret = ma->ops->match(mc, serial_number);
+			ret = ma->ops->match(mc, sn);
 	}
 	spin_unlock_bh(&match_algorithm_lock);
 
@@ -69,44 +91,54 @@ static ssize_t gv_proc_write(struct file *filp,
 		const char __user *buf, size_t size, loff_t *offset)
 {
 	int ret = 0;
-	size_t copy_len = size;
+#define BUFFSIZE (MAX_IKVERSION_LEN + MAX_SN_LEN + 2)
+	char ikver_sn[BUFFSIZE];
+	char *ikver = NULL, *sn = NULL, *match, *pikver_sn = ikver_sn;
 
 	atomic_inc(&g_is_validating);
-	if (size >= MAX_IKVERSION_LEN)
-		copy_len = MAX_IKVERSION_LEN - 1;
+	if (size >= BUFFSIZE)
+		return -EINVAL;
 
-	if ((ret = copy_from_user(g_ikversion, buf, copy_len)) < 0) {
+	if ((ret = copy_from_user(ikver_sn, buf, size)) < 0) {
 		atomic_dec(&g_is_validating);
 		return -ENOMEM;
 	}
 
-	g_ikversion[copy_len] = '\0';
+	ikver_sn[size] = '\0';
+
+	match = strsep(&pikver_sn, " ");
+	if (!pikver_sn)
+		return -EINVAL;
+
+	ikver = match;
+	sn = pikver_sn;
 
 	/* 正版检查 */
-	if (genuine_verification(g_ikversion, serial_number))
+	if (genuine_verification(ikver, sn)) {
 		atomic_set(&g_is_genuine, 1);
+		cancel_punishment();
+	}
 
 	atomic_dec(&g_is_validating);
 	*offset += size;
 	return size;
 }
 
-static ssize_t gv_proc_read(struct file *filp, char __user *buff,
-		size_t size, loff_t *offset)
+static ssize_t gv_proc_read(struct file *file, char __user *buf,
+		size_t size, loff_t *ppos)
 {
-	if (atomic_read(&g_is_validating) == 1)
+	char message[2] = {0};
+	if (atomic_read(&g_is_validating))
 		return 0;
 
-	if (size <= 2)
-		return 0;
-
-	if (atomic_read(&g_is_genuine) == 0)
-		copy_to_user(buf, "0", 2);
+	if (atomic_read(&g_is_genuine))
+		message[0] = '1';
 	else
-		copy_to_user(buf, "1", 2);
+		message[0] = '0';
+	message[1] = '\0';
 
-	*offset += 2;
-	return 2;
+	return simple_read_from_buffer(buf, size, ppos, message,
+			sizeof(message));
 }
 
 static const struct file_operations gv_proc_ops = {
@@ -117,7 +149,8 @@ static const struct file_operations gv_proc_ops = {
 	.release = seq_release
 };
 
-int register_match_algorithm(const char *ikversion, struct match_operations *ops)
+int register_match_algorithm(const char *ikversion,
+		struct match_operations *ops)
 {
 	struct match_algorithm *ma = NULL;
 
@@ -162,12 +195,13 @@ static int __init gv_init(void)
 
 	init_ma01();
 
+	start_punishment();
 	return 0;
 }
 
 static void __exit gv_exit(void)
 {
-	remove_proc_entry(SET_IKVERSION_PROC_NAME, NULL);
+	remove_proc_entry(GV_PROC_NAME, NULL);
 }
 
 module_init(gv_init);

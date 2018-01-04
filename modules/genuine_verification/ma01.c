@@ -7,7 +7,6 @@
    1. 在2018-03-01前会返回序列号
    2. 匹配规则为machine number
  */
-
 static bool is_exceed_first_version_date(void)
 {
 	struct timeval now;
@@ -20,9 +19,16 @@ static bool is_exceed_first_version_date(void)
 		tm_val.tm_mon >= 2 && tm_val.tm_mday >= 1;
 }
 
-static bool ma01_match(uint64_t mc, uint64_t sn)
+static bool ma01_match(uint64_t mc, char *sn_str)
 {
+	unsigned long sn;
 	bool is_exceed = is_exceed_first_version_date();
+
+	if (sn_str == NULL)
+		return false;
+
+	if (kstrtoul(sn_str, 10, &sn) < 0)
+		return false;
 
 	if (~(mc^sn) == 0)
 		return true;

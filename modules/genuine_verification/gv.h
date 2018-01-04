@@ -4,7 +4,7 @@
 #include <linux/types.h>
 
 struct match_operations {
-	bool (*match) (uint64_t , uint64_t);
+	bool (*match) (uint64_t , char*);
 	uint64_t (*get_sn) (uint64_t);
 };
 
