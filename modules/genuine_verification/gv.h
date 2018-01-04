@@ -3,11 +3,15 @@
 
 #include <linux/types.h>
 
+#define MAX_IKVERSION_LEN 32
+#define SN_LEN 21
+#define MC_LEN 21
+
 struct match_operations {
-	bool (*match) (uint64_t , char*);
-	uint64_t (*get_sn) (uint64_t);
+	bool (*match) (char*, char*);
 };
 
+void generate_machine_code(char mcbuf[MC_LEN]);
 int register_match_algorithm(const char *, struct match_operations *);
 void unregister_match_algorithm(const char *);
 
