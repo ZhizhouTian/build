@@ -1,5 +1,10 @@
-obj-m := test_hlist.o
+KERNEL_DIR=/media/zz/linux/works/vms/kernel-stable/
+OUT=/media/zz/linux/works/vms/build/out
+
+MODULE_NAME=test_sha1
+obj-m += ${MODULE_NAME}.o
+
 all:
-	make -C ../kernel-stable O=/media/zz/linux/works/vms/out M=`pwd` modules
+	make -C ${KERNEL_DIR} O=${OUT} M=`pwd` modules
 clean:
-	make -C ../kernel-stable O=/media/zz/linux/works/vms/out M=`pwd` clean
+	make -C ${KERNEL_DIR} O=${OUT} M=`pwd` clean

@@ -24,8 +24,8 @@ mkdir -p _rootfs/mnt/
 mkdir -p _rootfs/lib64
 mkdir -p _rootfs/dev/
 
-if [ -d ${WORKDIR}/../modules ]; then
-	find ${WORKDIR}/../modules/ -name "*.ko" -exec cp {} _rootfs/modules/ \;
+if [ -d ${WORKDIR}/modules ]; then
+	find ${WORKDIR}/modules/ -name "*.ko" -exec cp {} _rootfs/modules/ \;
 fi
 cp -arf /lib/x86_64-linux-gnu/* _rootfs/lib64/
 rm -rf _rootfs/lib/*.a

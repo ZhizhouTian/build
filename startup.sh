@@ -5,9 +5,9 @@ WORKDIR=/media/zz/linux/works
 $WORKDIR/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
 	     -S \
 	     -name QEMUGuest0 \
-	     -gdb tcp::1235 \
 	     -enable-kvm \
-	     -serial telnet::1234,server,nowait \
+	     -gdb tcp::1234 \
+	     -serial telnet::1235,server,nowait \
 	     -monitor telnet::1236,server,nowait \
 	     -m 1024M \
 	     -netdev tap,id=hn0,ifname=tap0,script=no,downscript=no \
