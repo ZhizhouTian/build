@@ -48,19 +48,46 @@ static void print_md5(unsigned char *md5)
 		pr_info("%x-%d\n", md5[i], i);
 }
 
+static int str2md5hex(char *sn, unsigned char *sn_md5)
+{
+	int i;
+
+	for (i = 0; i < MD5_LENGTH; i++) {
+		char s[3];
+		s[0] = sn[2 * i];
+		s[1] = sn[2 * i + 1];
+		s[2] = '\0';
+		if (kstrtou8(s, 16, &sn_md5[i]) < 0)
+			return -1;
+	}
+
+	return 0;
+}
+
 static bool ma01_match(char* mc, char *sn)
 {
 	unsigned char mc_md5[MD5_LENGTH];
+	unsigned int i;
+	unsigned char sn_md5[MD5_LENGTH];
 
 	if (get_md5(mc, mc_md5) < 0)
 		return false;
 
-	print_md5(mc_md5);
-	if (strncmp(sn, mc_md5, 20))
+	if (strlen(sn) < MD5_LENGTH * 2)
 		return false;
 
-	if (strncmp(sn+10, salt_md5+10, MD5_LENGTH - 10))
+	if (str2md5hex(sn, sn_md5) < 0)
 		return false;
+
+	for (i = 0; i < 10; i++) {
+		if (sn_md5[i] != mc_md5[i])
+			return false;
+	}
+
+	for (i = 10; i < MD5_LENGTH; i++) {
+		if (sn_md5[i] != salt_md5[i])
+			return false;
+	}
 
 	return true;
 }
