@@ -1,15 +1,9 @@
-#include <linux/time.h>
-#include <linux/netdevice.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/crypto.h>
 #include <linux/err.h>
 #include <linux/scatterlist.h>
-
-#include "gv.h"
-
-#define MA01_IKVERSION "3.0.3"
 
 #define MD5_LENGTH     16
 
@@ -38,7 +32,7 @@ static int get_md5(char *input, unsigned char *output)
 	return 0;
 }
 
-static void ma01_generate_serial_number(char *mc, char *sn)
+static int __init md5_init(void)
 {
 	int i;
 	char salt[] = "www.ikuai8.com";
@@ -53,28 +47,13 @@ static void ma01_generate_serial_number(char *mc, char *sn)
 	return 0;
 }
 
-static bool ma01_match(char* mc, char *sn)
+static void __exit md5_exit(void)
 {
-	char snbuf[SN_LEN];
-
-	ma01_generate_serial_number(mc, snbuf);
-
-	if (!strncmp(snbuf, sn, MC_LEN))
-		return true;
-
-	return false;
+	printk(KERN_INFO "md5: %s\n", __FUNCTION__);
 }
 
-struct match_operations ma01_ops = {
-	.match = ma01_match,
-};
+module_init(md5_init);
+module_exit(md5_exit);
 
-int init_ma01(void)
-{
-	return register_match_algorithm(MA01_IKVERSION, &ma01_ops);
-}
-
-void exit_ma01(void)
-{
-	unregister_match_algorithm(MA01_IKVERSION);
-}
+MODULE_LICENSE("Dual MIT/GPL");
+MODULE_AUTHOR("Me");
