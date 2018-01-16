@@ -4,7 +4,7 @@
 #include <linux/types.h>
 
 #define MAX_IKVERSION_LEN 32
-#define SN_LEN 16
+#define SN_LEN 21
 #define MC_LEN 21
 
 struct match_operations {
