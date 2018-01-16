@@ -38,31 +38,31 @@ static int get_md5(char *input, unsigned char *output)
 	return 0;
 }
 
-static void ma01_generate_serial_number(char *mc, char *sn)
+static unsigned char salt_md5[MD5_LENGTH];
+
+static void print_md5(unsigned char *md5)
 {
 	int i;
-	char salt[] = "www.ikuai8.com";
-	unsigned char output[MD5_LENGTH];
-
-	memset(output, 0x0, sizeof(output));
-	get_md5(salt, output);
 
 	for (i = 0; i < MD5_LENGTH; i++)
-		printk(KERN_ERR "%x-%d\n", output[i], i);
-
-	return 0;
+		pr_info("%x-%d\n", md5[i], i);
 }
 
 static bool ma01_match(char* mc, char *sn)
 {
-	char snbuf[SN_LEN];
+	unsigned char mc_md5[MD5_LENGTH];
 
-	ma01_generate_serial_number(mc, snbuf);
+	if (get_md5(mc, mc_md5) < 0)
+		return false;
 
-	if (!strncmp(snbuf, sn, MC_LEN))
-		return true;
+	print_md5(mc_md5);
+	if (strncmp(sn, mc_md5, 20))
+		return false;
 
-	return false;
+	if (strncmp(sn+10, salt_md5+10, MD5_LENGTH - 10))
+		return false;
+
+	return true;
 }
 
 struct match_operations ma01_ops = {
@@ -71,6 +71,11 @@ struct match_operations ma01_ops = {
 
 int init_ma01(void)
 {
+	unsigned char salt[] = "www.ikuai8.com";
+	memset(salt_md5, 0x0, sizeof(salt_md5));
+	if (get_md5(salt, salt_md5) < 0)
+		return -1;
+	print_md5(salt_md5);
 	return register_match_algorithm(MA01_IKVERSION, &ma01_ops);
 }
 
