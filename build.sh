@@ -2,6 +2,7 @@
 
 WORKDIR=$(pwd)
 BUSYBOX_DIR=${WORKDIR}/../busybox
+IPTABLES_DIR=${WORKDIR}/../iptables
 
 #do clean works
 rm -rf tmpfs
@@ -12,6 +13,7 @@ mkdir _rootfs
 # copy
 cp -rf rootfs/* _rootfs/
 cp $BUSYBOX_DIR/_install/*  _rootfs/ -raf
+cp $IPTABLES_DIR/out/* _rootfs/ -raf
 
 mkdir -p _rootfs/etc/init.d
 mkdir -p _rootfs/proc/
@@ -23,6 +25,7 @@ mkdir -p _rootfs/var/
 mkdir -p _rootfs/mnt/
 mkdir -p _rootfs/lib64
 mkdir -p _rootfs/dev/
+mkdir -p _rootfs/run/
 
 if [ -d ${WORKDIR}/modules ]; then
 	find ${WORKDIR}/modules/ -name "*.ko" -exec cp {} _rootfs/modules/ \;
