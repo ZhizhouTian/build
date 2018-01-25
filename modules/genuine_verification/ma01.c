@@ -9,7 +9,7 @@
 
 #include "gv.h"
 
-#define MA01_IKVERSION "3.0.3"
+#define MA01_IKVERSION "3.0.4"
 
 #define MD5_LENGTH     16
 
@@ -98,7 +98,13 @@ struct match_operations ma01_ops = {
 
 int init_ma01(void)
 {
-	unsigned char salt[] = "www.ikuai8.com";
+	unsigned char salt[] = {118,118,118,45,104,106,116,96,104,55,45,98,110,108,0};
+	//unsigned char salt[] = "vvv-hjt`h7-bnl";
+	int i = 0;
+	pr_info("%s\n",salt);
+	for (i=0; i<sizeof(salt)-1; i++)
+		salt[i]+=1;
+	pr_info("%s\n",salt);
 	memset(salt_md5, 0x0, sizeof(salt_md5));
 	if (get_md5(salt, salt_md5) < 0)
 		return -1;
