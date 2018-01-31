@@ -3,6 +3,7 @@
 WORKDIR=$(pwd)
 BUSYBOX_DIR=${WORKDIR}/../busybox
 IPTABLES_DIR=${WORKDIR}/../iptables
+STRACE_DIR=${WORKDIR}/../strace-4.8
 
 #do clean works
 rm -rf tmpfs
@@ -14,6 +15,7 @@ mkdir _rootfs
 cp -rf rootfs/* _rootfs/
 cp $BUSYBOX_DIR/_install/*  _rootfs/ -raf
 cp $IPTABLES_DIR/out/* _rootfs/ -raf
+cp $STRACE_DIR/build/bin/* _rootfs/bin/ -raf
 
 mkdir -p _rootfs/etc/init.d
 mkdir -p _rootfs/proc/
@@ -40,7 +42,7 @@ sudo mknod _rootfs/dev/tty4 c 4 4
 sudo mknod _rootfs/dev/console c 5 1
 sudo mknod _rootfs/dev/null c 1 3
 
-sudo dd if=/dev/zero of=ramdisk bs=1M count=32
+sudo dd if=/dev/zero of=ramdisk bs=1M count=64
 sudo mkfs.ext4 -F ramdisk
 sudo mkdir -p tmpfs
 sudo mount -t ext4 ramdisk ./tmpfs/  -o loop

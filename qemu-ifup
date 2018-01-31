@@ -9,6 +9,7 @@ if [ -n "$1" ]; then
 	sleep 0.5s
 	#brctl addif $switch $1
 	ip link set $1 master $switch
+	ifconfig $1 192.168.3.102
 	exit 0
 else
 	echo "Error: no interface specified"

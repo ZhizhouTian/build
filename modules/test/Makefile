@@ -1,7 +1,7 @@
 KERNEL_DIR=/media/zz/linux/works/vms/kernel-stable/
 OUT=/media/zz/linux/works/vms/build/out
 
-MODULE_NAME=test_md5
+MODULE_NAME=test_ps_rss
 obj-m += ${MODULE_NAME}.o
 
 all:
