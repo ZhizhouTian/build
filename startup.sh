@@ -6,6 +6,7 @@ $WORKDIR/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
 	     -S \
 	     -name QEMUGuest0 \
 	     -enable-kvm \
+	     -smp 4 \
 	     -gdb tcp::1234 \
 	     -serial telnet::1235,server,nowait \
 	     -monitor telnet::1236,server,nowait \
