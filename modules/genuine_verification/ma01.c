@@ -9,7 +9,7 @@
 
 #include "gv.h"
 
-#define MA01_IKVERSION "3.0.4"
+#define MA01_IKVERSION "3.1.0"
 
 #define MD5_LENGTH     16
 
@@ -39,14 +39,6 @@ static int get_md5(char *input, unsigned char *output)
 }
 
 static unsigned char salt_md5[MD5_LENGTH];
-
-static void print_md5(unsigned char *md5)
-{
-	int i;
-
-	for (i = 0; i < MD5_LENGTH; i++)
-		pr_info("%x-%d\n", md5[i], i);
-}
 
 static int str2md5hex(char *sn, unsigned char *sn_md5)
 {
@@ -99,16 +91,13 @@ struct match_operations ma01_ops = {
 int init_ma01(void)
 {
 	unsigned char salt[] = {118,118,118,45,104,106,116,96,104,55,45,98,110,108,0};
-	//unsigned char salt[] = "vvv-hjt`h7-bnl";
-	int i = 0;
-	pr_info("%s\n",salt);
+	int i;
+
 	for (i=0; i<sizeof(salt)-1; i++)
 		salt[i]+=1;
-	pr_info("%s\n",salt);
 	memset(salt_md5, 0x0, sizeof(salt_md5));
 	if (get_md5(salt, salt_md5) < 0)
 		return -1;
-	print_md5(salt_md5);
 	return register_match_algorithm(MA01_IKVERSION, &ma01_ops);
 }
 

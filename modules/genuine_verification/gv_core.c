@@ -1,25 +1,17 @@
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
-#include <linux/list.h>
-#include <linux/slab.h>
 #include <net/net_namespace.h>
 #include <linux/netdevice.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 
-#include <asm/uaccess.h>
-
 #include "gv.h"
 
-MODULE_LICENSE("GPL");
+#define GV_PROC_NAME "genuine_verification"
 
 static LIST_HEAD(g_match_algorithm_head);
-static spinlock_t match_algorithm_lock;
+static DEFINE_MUTEX(g_match_algorithm_mutex);
 static atomic_t g_is_genuine;
-static atomic_t g_is_validating;
 
 struct match_algorithm {
 	char ikversion[MAX_IKVERSION_LEN];
@@ -52,61 +44,110 @@ struct timer_list g_punishment_timer;
 
 static void punishment(unsigned long data)
 {
-	// do nothing
-	//panic("盗版重启");
+	panic("盗版重启");
 }
 
 void start_punishment(void)
 {
-	pr_emerg("iKuai正版验证模块启动.\n");
 	init_timer(&g_punishment_timer);
-	g_punishment_timer.expires = jiffies + HZ*60*60*5;
+	g_punishment_timer.expires = jiffies + HZ*60*60*24*3;
 	g_punishment_timer.function = punishment;
 	add_timer(&g_punishment_timer);
 }
 
 void cancel_punishment(void)
 {
-	pr_emerg("iKuai正版验证成功.\n");
 	del_timer_sync(&g_punishment_timer);
 }
 
-static bool genuine_verification(char *ikversion, char *sn)
+static int reset_punishment(char *input)
+{
+	unsigned long type = 0;
+
+	/* echo punishment:x > /proc/genuine_verification */
+	strsep(&input, ":");
+	if (!input)
+		return -EINVAL;
+
+	if (kstrtol(input, 10, &type) < 0)
+		return -EINVAL;
+	/* TODO: reset punishment */
+	return 0;
+}
+
+static bool _genuine_verification(char *ikversion, char *sn)
 {
 	struct match_algorithm *ma;
 	char mc[MC_LEN];
 	bool ret = false;
 
 	generate_machine_code(mc);
-	spin_lock_bh(&match_algorithm_lock);
+
+	if (mutex_lock_interruptible(&g_match_algorithm_mutex))
+		return -ERESTARTSYS;
+
 	list_for_each_entry(ma, &g_match_algorithm_head, next) {
 		if (!strncmp(ikversion, ma->ikversion, sizeof(ma->ikversion))) {
 			ret = ma->ops->match(mc, sn);
 			break;
 		}
 	}
-	spin_unlock_bh(&match_algorithm_lock);
+	mutex_unlock(&g_match_algorithm_mutex);
 
 	return ret;
 }
 
-#define GV_PROC_NAME "genuine_verification"
-static int gv_proc_open(struct inode *inode, struct file *filp)
+static int genuine_verification(char *input)
 {
-	return single_open(filp, NULL, NULL);
+	char *ikver = NULL, *sn = NULL, *match = NULL, *pinput = input;
+
+	/* echo ikversion,sn > /proc/genuine_verification */
+	match = strsep(&pinput, ",");
+	if (!pinput)
+		return -EINVAL;
+
+	ikver = match;
+	sn = pinput;
+
+	if (_genuine_verification(ikver, sn)) {
+		atomic_set(&g_is_genuine, 1);
+		cancel_punishment();
+	}
+
+	return 0;
 }
 
-static ssize_t gv_proc_write(struct file *filp, const char __user *userbuf,
+static int ik_gv_seq_show(struct seq_file *s, void *v)
+{
+	if (atomic_read(&g_is_genuine) == 0) {
+		char mc[MC_LEN];
+		generate_machine_code(mc);
+
+		seq_printf(s, "machine_code=%s\n", mc);
+		seq_printf(s, "genuine=0\n");
+		seq_printf(s, "reboot_time=%lu\n",
+			(g_punishment_timer.expires-jiffies) / HZ);
+		return 0;
+	}
+
+	seq_printf(s, "machine_code=0\n");
+	seq_printf(s, "genuine=1\n");
+	seq_printf(s, "reboot_time=0\n");
+
+	return 0;
+}
+
+static int ik_gv_proc_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, ik_gv_seq_show, NULL);
+}
+
+static ssize_t ik_gv_proc_write(struct file *filp, const char __user *userbuf,
 		size_t size, loff_t *offset)
 {
-#define INPUT_SIZE (MAX_IKVERSION_LEN + MAX_SERIAL_NUMBER_LEN + 2)
+#define INPUT_SIZE (MAX_IKVERSION_LEN + SN_LEN + 2)
 	char input[INPUT_SIZE];
-	char *ikver = NULL, *sn = NULL, *match = NULL, *pinput = input;
-	int i, err;
-
-	if (atomic_read(&g_is_validating) == 1)
-		goto end;
-	atomic_set(&g_is_validating, 1);
+	int i, retval = 0;
 
 	if (atomic_read(&g_is_genuine) == 1)
 		goto end;
@@ -114,8 +155,8 @@ static ssize_t gv_proc_write(struct file *filp, const char __user *userbuf,
 	size = (size > INPUT_SIZE-1)?(INPUT_SIZE-1):(size);
 
 	if (copy_from_user(input, userbuf, size)) {
-		err = -EFAULT;
-		goto err;
+		retval = -EFAULT;
+		goto end;
 	}
 
 	input[size] = '\0';
@@ -127,77 +168,25 @@ static ssize_t gv_proc_write(struct file *filp, const char __user *userbuf,
 		i--;
 	}
 
-	/* echo ikversion,sn > /proc/genuine_verification */
-	match = strsep(&pinput, ",");
-	if (!pinput) {
-		err = -EINVAL;
-		goto err;
-	}
-	ikver = match;
-	sn = pinput;
-
-	if (genuine_verification(ikver, sn)) {
-		atomic_set(&g_is_genuine, 1);
-	}
-
-end:
-	atomic_set(&g_is_validating, 0);
-	*offset += size;
-	return size;
-err:
-	atomic_set(&g_is_validating, 0);
-	return err;
-}
-
-static ssize_t gv_proc_read(struct file *filp, char __user *userbuf,
-		size_t size, loff_t *offset)
-{
-	char message[2];
-
-	if (atomic_read(&g_is_validating) == 1) {
-		message[0] = '2';
-		goto end;
-	}
-
-	if (atomic_read(&g_is_genuine) == 0)
-		message[0] = '0';
+	if (!strncmp(input, "punishment", sizeof("punishment") - 1))
+		retval = reset_punishment(input);
 	else
-		message[0] = '1';
+		retval = genuine_verification(input);
 
+	if (retval != 0)
+		return retval;
 end:
-	message[1] = '\0';
-	return simple_read_from_buffer(userbuf, size, offset,
-		message, sizeof(message));
+	*offset += size;
+	retval = size;
+	return retval;
 }
 
-static struct file_operations gv_proc_ops = {
-	.owner = THIS_MODULE,
-	.open = gv_proc_open,
-	.read = gv_proc_read,
-	.write = gv_proc_write,
-};
-
-#define MC_PROC_NAME "mc"
-static int mc_proc_open (struct inode *inode, struct file *filp)
-{
-	return single_open(filp, NULL, NULL);
-}
-
-static ssize_t mc_proc_read(struct file *file, char __user *buf,
-		size_t size, loff_t *ppos)
-{
-	char message[MC_LEN] = {0};
-	generate_machine_code(message);
-
-	return simple_read_from_buffer(buf, size, ppos, message,
-			sizeof(message));
-}
-
-static const struct file_operations mc_proc_ops = {
-	.owner   = THIS_MODULE,
-	.open    = mc_proc_open,
-	.read    = mc_proc_read,
-	.release = seq_release
+static const struct file_operations ik_gv_proc_ops = {
+	.owner	 = THIS_MODULE,
+	.open	 = ik_gv_proc_open,
+	.read	 = seq_read,
+	.write	 = ik_gv_proc_write,
+	.release = seq_release,
 };
 
 int register_match_algorithm(const char *ikversion,
@@ -209,7 +198,7 @@ int register_match_algorithm(const char *ikversion,
 	if (!ikversion)
 		return -EINVAL;
 
-	spin_lock_bh(&match_algorithm_lock);
+	mutex_lock(&g_match_algorithm_mutex);
 	list_for_each_entry(ma, &g_match_algorithm_head, next) {
 		if (!strncmp(ma->ikversion, ikversion, sizeof(ma->ikversion))) {
 			err = -EINVAL;
@@ -225,7 +214,7 @@ int register_match_algorithm(const char *ikversion,
 	list_add_tail(&ma->next, &g_match_algorithm_head);
 	err = 0;
 end:
-	spin_unlock_bh(&match_algorithm_lock);
+	mutex_unlock(&g_match_algorithm_mutex);
 	return err;
 }
 
@@ -233,36 +222,35 @@ void unregister_match_algorithm(const char *ikversion)
 {
 	struct match_algorithm *ma, *tmp;
 
-	spin_lock_bh(&match_algorithm_lock);
+	mutex_lock(&g_match_algorithm_mutex);
 	list_for_each_entry_safe(ma, tmp, &g_match_algorithm_head, next) {
 		if (!strncmp(ma->ikversion, ikversion, sizeof(ma->ikversion))) {
 			list_del(&ma->next);
 			kfree(ma);
 		}
 	}
-	spin_unlock_bh(&match_algorithm_lock);
+	mutex_unlock(&g_match_algorithm_mutex);
 }
 
-static __init int gvcore_init(void)
+static int __init ik_gv_init(void)
 {
-	proc_create_data(GV_PROC_NAME, 0644, NULL, &gv_proc_ops, NULL);
-	proc_create_data(MC_PROC_NAME, 0400, NULL, &mc_proc_ops, NULL);
-	spin_lock_init(&match_algorithm_lock);
+	proc_create_data(GV_PROC_NAME, 0644, NULL, &ik_gv_proc_ops, NULL);
+
 	atomic_set(&g_is_genuine, 0);
-	atomic_set(&g_is_validating, 0);
 	init_ma01();
 	start_punishment();
 
 	return 0;
 }
 
-static __exit void gvcore_exit(void)
+static void __exit ik_gv_exit(void)
 {
 	remove_proc_entry(GV_PROC_NAME, NULL);
-	remove_proc_entry(MC_PROC_NAME, NULL);
+
 	exit_ma01();
 	cancel_punishment();
 }
 
-module_init(gvcore_init);
-module_exit(gvcore_exit);
+module_init(ik_gv_init);
+module_exit(ik_gv_exit);
+MODULE_LICENSE("GPL");
