@@ -1,0 +1,3 @@
+message URLWhitelist {
+	repeated string url = 1;
+}

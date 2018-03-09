@@ -1,0 +1,1 @@
+protoc-c --encode=URLWhitelist urlwhitelist.proto < urlwhitelist.txt  > abc.bin
