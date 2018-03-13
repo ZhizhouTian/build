@@ -1,10 +1,7 @@
 #ifndef __URL_SECURE_H__
 #define __URL_SECURE_H__
 
-#include "urlwhitelist.pb-c.h"
-#include "protobuf-c.h"
-
-#define URL_MAX_LEN 2083
+#define MAX_URL_LEN 2083
 
 #define IK_ENABLE_URL_SECURE_WHITELIST
 
