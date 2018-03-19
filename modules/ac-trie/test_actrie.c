@@ -132,7 +132,7 @@ void create_ac_tries(char **patterns)
 	ac_trie_display(accurate_trie);
 }
 
-int main (int argc, char **argv)
+static int __init test_actrie_init(void)
 {
 	AC_TEXT_t chunk;
 	AC_MATCH_t match;
@@ -156,9 +156,16 @@ int main (int argc, char **argv)
 		print_match (&match);
 	}
 
+	return 0;
+}
+
+static void __exit test_actrie_exit(void)
+{
 	/* You may release the automata after you have done with it. */
 	ac_trie_release (fuzzy_trie);
 	ac_trie_release(accurate_trie);
-
-	return 0;
 }
+
+module_init(test_actrie_init);
+module_exit(test_actrie_exit);
+MODULE_LICENSE("GPL");
