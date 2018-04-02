@@ -1,15 +1,13 @@
 #include "ahocorasick.h"
 
 char *sample_patterns[] = {
-    "*.baidu.com",
-    "www.qq.com",
     "baidu.com",
     "www.163.com.cn",
 };
 #define PATTERN_COUNT (sizeof(sample_patterns)/sizeof(char*))
 
-AC_TRIE_t *fuzzy_trie;
-AC_TRIE_t *accurate_trie;
+AC_TRIE_t *g_fuzzy_trie;
+AC_TRIE_t *g_accurate_trie;
 
 #define MAX_HOST_LEN 512
 
@@ -52,18 +50,24 @@ void print_match (AC_MATCH_t *m)
 	pr_info ("\n");
 }
 
-void create_ac_tries(char **patterns)
+int us_create_ac_tries(char **patterns, size_t patterns_len)
 {
 	unsigned int i;
+	AC_TRIE_t *fuzzy_trie, *old_fuzzy_trie;
+	AC_TRIE_t *accurate_trie, *old_accurate_trie;
 
 	/* Get new tries */
 	fuzzy_trie = ac_trie_create();
 	accurate_trie = ac_trie_create();
 
-	for (i = 0; i < PATTERN_COUNT; i++) {
+	if (!fuzzy_trie || !accurate_trie)
+		return -ENOMEM;
+
+	for (i = 0; i < patterns_len; i++) {
 		AC_PATTERN_t patt;
 		char *pattern = patterns[i];
-		int nr_dot = dot_num(pattern, strlen(pattern));
+		size_t plen = strnlen(pattern, MAX_HOST_LEN);
+		int nr_dot = dot_num(pattern, plen);
 		bool is_fuzzy = false;
 
 		if (nr_dot < 1) {
@@ -75,27 +79,18 @@ void create_ac_tries(char **patterns)
 		}
 
 		if (pattern[0] == '*') {
-			int j = 0;
 			is_fuzzy = true;
-			while (*pattern != '.' && *pattern != '\0') {
+			do {
 				pattern++;
-				j++;
-				if (j >= MAX_HOST_LEN) {
-					break;
-				}
-			}
-			if (j >= MAX_HOST_LEN) {
-				continue;
-			}
-			if (*pattern == '\0') {
-				continue;
-			}
+				plen--;
+			} while (*pattern != '.');
 			pattern++;
+			plen--;
 		}
 
 		/* Fill the pattern data */
 		patt.ptext.astring = pattern;
-		patt.ptext.length = strlen(patt.ptext.astring);
+		patt.ptext.length = plen;
 
 		/* The replacement pattern is not applicable in this program, so better 
 		 * to initialize it with 0 */
@@ -128,33 +123,94 @@ void create_ac_tries(char **patterns)
 	 * longer time for a very large number of patters */
 
 	/* Display the trie if you wish */
-	ac_trie_display(fuzzy_trie);
-	ac_trie_display(accurate_trie);
+	//ac_trie_display(fuzzy_trie);
+	//ac_trie_display(accurate_trie);
+	old_fuzzy_trie = rcu_dereference(g_fuzzy_trie);
+	old_accurate_trie = rcu_dereference(g_accurate_trie);
+	rcu_assign_pointer(g_fuzzy_trie, fuzzy_trie);
+	rcu_assign_pointer(g_accurate_trie, accurate_trie);
+
+	synchronize_rcu();
+	if (old_fuzzy_trie)
+		ac_trie_release(old_fuzzy_trie);
+	if (old_accurate_trie)
+		ac_trie_release(old_accurate_trie);
+
+	return 0;
+}
+
+static bool us_is_host_in_whitelist(const char *host, unsigned int host_len)
+{
+	AC_TEXT_t chunk;
+	AC_MATCH_t match;
+	const char *phost = host;
+	unsigned int len = host_len;
+	int nr_dot;
+	AC_TRIE_t *fuzzy_trie = rcu_dereference(g_fuzzy_trie);
+	AC_TRIE_t *accurate_trie = rcu_dereference(g_accurate_trie);
+
+	if (!fuzzy_trie || !accurate_trie)
+		return false;
+
+	if (host_len > MAX_HOST_LEN)
+		return false;
+
+	nr_dot = dot_num(host, host_len);
+
+	if (nr_dot < 1)
+		return false;
+
+	/* fuzzy match */
+	if (nr_dot > 1) {
+		while (*phost != '.') {
+			phost++;
+			len--;
+		}
+		phost++;
+		len--;
+	}
+
+	rcu_read_lock();
+
+	chunk.astring = phost;
+	chunk.length = len;
+	ac_trie_settext (fuzzy_trie, &chunk, 0);
+
+	if ((match = ac_trie_findnext(fuzzy_trie)).size) {
+		rcu_read_unlock();
+		return true;
+	}
+
+	/* accurate match */
+	chunk.astring = host;
+	chunk.length = host_len;
+	ac_trie_settext (accurate_trie, &chunk, 0);
+	if ((match = ac_trie_findnext(accurate_trie)).size) {
+		rcu_read_unlock();
+		return true;
+	}
+
+	rcu_read_unlock();
+	return false;
 }
 
 static int __init test_actrie_init(void)
 {
-	AC_TEXT_t chunk;
-	AC_MATCH_t match;
-	const char *chunk1 = "map.baidu.com";
+	const char *chunk1 = "map.baidu.com.cn";
+	const char *chunk2 = "163.com";
+	const char *chunk3 = "a.baidu.com";
+	bool is_in_whitelist = false;
 
-	create_ac_tries(sample_patterns);
-	pr_info ("Searching: \"%s\"\n", chunk1);
+	us_create_ac_tries(sample_patterns, PATTERN_COUNT);
 
-	chunk.astring = chunk1;
-	chunk.length = strlen(chunk.astring);
+	is_in_whitelist = us_is_host_in_whitelist(chunk1, strlen(chunk1));
+	pr_info("%s %s in whiltelist\n", chunk1, is_in_whitelist?"is":"is not");
 
-	/* Set the input text */
-	ac_trie_settext (fuzzy_trie, &chunk, 0);
+	is_in_whitelist = us_is_host_in_whitelist(chunk2, strlen(chunk2));
+	pr_info("%s %s in whiltelist\n", chunk2, is_in_whitelist?"is":"is not");
 
-	/* The ownership of the input text belongs to the caller program. I.e. the
-	 * API does not make a copy of that. It must remain valid until the end
-	 * of search of the given chunk. */
-
-	/* Find matches */
-	while ((match = ac_trie_findnext(fuzzy_trie)).size) {
-		print_match (&match);
-	}
+	is_in_whitelist = us_is_host_in_whitelist(chunk3, strlen(chunk3));
+	pr_info("%s %s in whiltelist\n", chunk3, is_in_whitelist?"is":"is not");
 
 	return 0;
 }
@@ -162,8 +218,10 @@ static int __init test_actrie_init(void)
 static void __exit test_actrie_exit(void)
 {
 	/* You may release the automata after you have done with it. */
-	ac_trie_release (fuzzy_trie);
-	ac_trie_release(accurate_trie);
+	if (g_fuzzy_trie)
+		ac_trie_release(g_fuzzy_trie);
+	if (g_accurate_trie)
+		ac_trie_release(g_accurate_trie);
 }
 
 module_init(test_actrie_init);
