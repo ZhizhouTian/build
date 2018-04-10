@@ -9,11 +9,11 @@
 
 #include "gv.h"
 
-#define MA01_IKVERSION "3.1.0"
-
 #define MD5_LENGTH     16
 
-static int get_md5(char *input, unsigned char *output)
+static unsigned char salt[] = {0x51,0x43,0x2d,0x48,0x6a,0x74,0x60,0x68,0x37,0x63,0x6e,0x73,0x42,0x6e,0x6c};
+
+static int get_md5(char *input, size_t input_len, unsigned char *output)
 {
 	struct scatterlist sg;
 	struct crypto_hash *tfm;
@@ -27,18 +27,16 @@ static int get_md5(char *input, unsigned char *output)
 	desc.tfm = tfm;
 	desc.flags = 0;
 
-	sg_init_one(&sg, input, strlen(input));
+	sg_init_one(&sg, input, input_len);
 	crypto_hash_init(&desc);
 
-	crypto_hash_update(&desc, &sg, strlen(input));
+	crypto_hash_update(&desc, &sg, input_len);
 	crypto_hash_final(&desc, output);
 
 	crypto_free_hash(tfm);
 
 	return 0;
 }
-
-static unsigned char salt_md5[MD5_LENGTH];
 
 static int str2md5hex(char *sn, unsigned char *sn_md5)
 {
@@ -56,13 +54,19 @@ static int str2md5hex(char *sn, unsigned char *sn_md5)
 	return 0;
 }
 
-static bool ma01_match(char* mc, char *sn)
+bool ma01_match(char* mc, char *sn)
 {
 	unsigned char mc_md5[MD5_LENGTH];
 	unsigned int i;
 	unsigned char sn_md5[MD5_LENGTH];
+	unsigned char input[MC_LEN + sizeof(salt) + 1];
+	size_t mc_len = strnlen(mc, MC_LEN);
 
-	if (get_md5(mc, mc_md5) < 0)
+	strncpy(input, mc, mc_len);
+	strncpy(input+mc_len, salt, sizeof(salt));
+	input[mc_len+sizeof(salt)] = '\0';
+
+	if (get_md5(input, mc_len+sizeof(salt), mc_md5) < 0)
 		return false;
 
 	if (strlen(sn) < MD5_LENGTH * 2)
@@ -71,37 +75,24 @@ static bool ma01_match(char* mc, char *sn)
 	if (str2md5hex(sn, sn_md5) < 0)
 		return false;
 
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < MD5_LENGTH; i++) {
 		if (sn_md5[i] != mc_md5[i])
-			return false;
-	}
-
-	for (i = 10; i < MD5_LENGTH; i++) {
-		if (sn_md5[i] != salt_md5[i])
 			return false;
 	}
 
 	return true;
 }
 
-struct match_operations ma01_ops = {
-	.match = ma01_match,
-};
-
 int init_ma01(void)
 {
-	unsigned char salt[] = {118,118,118,45,104,106,116,96,104,55,45,98,110,108,0};
 	int i;
 
-	for (i=0; i<sizeof(salt)-1; i++)
+	/* adjust salt */
+	for (i=0; i<sizeof(salt); i++)
 		salt[i]+=1;
-	memset(salt_md5, 0x0, sizeof(salt_md5));
-	if (get_md5(salt, salt_md5) < 0)
-		return -1;
-	return register_match_algorithm(MA01_IKVERSION, &ma01_ops);
+	return 0;
 }
 
 void exit_ma01(void)
 {
-	unregister_match_algorithm(MA01_IKVERSION);
 }
