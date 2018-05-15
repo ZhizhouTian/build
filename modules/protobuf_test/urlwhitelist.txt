@@ -1,3 +1,0 @@
-url: "www.ikuai8.com"
-url: "www.baidu.com"
-url: "www.qq.com"
