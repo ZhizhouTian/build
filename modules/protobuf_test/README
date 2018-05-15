@@ -1,1 +1,5 @@
-protoc-c --encode=URLWhitelist urlwhitelist.proto < urlwhitelist.txt  > abc.bin
+1. generate c/h:
+protoc-c --c_out=. urllist.proto
+
+2. generate protobuf files:
+protoc-c --encode=URLList urllist.proto < urllist.txt  > urllist.bin

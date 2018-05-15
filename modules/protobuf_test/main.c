@@ -6,26 +6,26 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "urlwhitelist.pb-c.h"
+#include "urllist.pb-c.h"
 
 int main(void)
 {
-	int fd = open("abc.bin", O_RDONLY);
+	int fd = open("urllist.bin", O_RDONLY);
 	char buf[1024];
 	struct stat stat;
-	URLWhitelist *uw;
+	URLList *uw;
 	int i;
 
 	if (fd < 0) {
-		printf("open abc.bin failed\n");
+		printf("open urllist.bin failed\n");
 		return 0;
 	}
 
 	fstat(fd, &stat);
 	read(fd, buf, stat.st_size);
-	uw = urlwhitelist__unpack(NULL, stat.st_size, buf);
+	uw = urllist__unpack(NULL, stat.st_size, buf);
 	if (!uw) {
-		printf("unpack url white list failed\n");
+		printf("unpack url list failed\n");
 		return 0;
 	}
 
@@ -33,6 +33,6 @@ int main(void)
 		printf("%s\n", uw->url[i]);
 	}
 
-	urlwhitelist__free_unpacked(uw, NULL);
+	urllist__free_unpacked(uw, NULL);
 	return 0;
 }
