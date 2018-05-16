@@ -1,0 +1,3 @@
+message URLList {
+	repeated string url = 1;
+}
