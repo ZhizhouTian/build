@@ -1,6 +1,6 @@
 #!/bin/bash
 
-WORKDIR=/media/zz/linux/works
+WORKDIR=/home/zz/works/source
 
 $WORKDIR/qemu/build/x86_64-softmmu/qemu-system-x86_64 \
 	     -S \

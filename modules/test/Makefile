@@ -1,7 +1,8 @@
-KERNEL_DIR=/home/zz/works/source
-OUT=/media/zz/linux/works/vms/build/out
+WORKDIR=/home/zz/works/source
+KERNEL_DIR=${WORKDIR}/linux
+OUT=${WORKDIR}/build/out
 
-MODULE_NAME=test_ps_rss
+MODULE_NAME=test_enc_gwid
 obj-m += ${MODULE_NAME}.o
 
 all:
