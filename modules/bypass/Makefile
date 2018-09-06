@@ -1,4 +1,4 @@
-KERNEL_DIR=/media/zz/linux/works/vms/kernel-stable/
+KERNEL_DIR=/home/zz/works/source
 OUT=/media/zz/linux/works/vms/build/out
 
 MODULE_NAME=bypass
