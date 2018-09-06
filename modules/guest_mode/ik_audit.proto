@@ -1,0 +1,123 @@
+enum ImAuditEvt {
+	IM_LOGIN = 0;
+	IM_LOGOUT = 1;
+}
+
+enum ImAuditProto {
+	IM_UDP = 0;
+	IM_TCP = 1;
+}
+
+message Range {
+	required uint32 min = 1;
+	required uint32 max = 2;
+}
+
+// Contains NR data
+message AppNrData {
+	required uint32 dir = 1;
+	repeated uint32 pkt_seq = 2;
+	repeated uint32 port = 3;
+	optional bytes prefix_match = 4;
+	optional uint32 prefix_offset = 5;
+	optional int32 match_offset = 6 [default = 0];
+	optional uint32 disc_logout = 7 [default = 0];
+	repeated Range port_range = 8;
+	optional ImAuditProto proto = 9;
+	repeated Range fwd_port_range = 10;
+	optional uint32 min_pkt_seq = 11;
+	optional bool is_uniq_id = 12;
+	optional string id_name = 13;
+	optional bool is_audit_log = 14;
+}
+
+// APP data match condition
+message AppMatchData {
+	required uint32 dir = 1;
+	repeated uint32 pkt_seq = 2;
+	repeated uint32 port = 3;
+	repeated Range len_range = 4;
+	required bytes match_str = 5;
+	optional int32 offset = 6 [default = 0];
+	repeated Range port_range = 7;
+	optional ImAuditProto proto = 8;
+	repeated Range fwd_port_range = 9;
+	optional uint32 min_pkt_seq = 10;
+}
+
+message AppData {
+	required uint32 max_seq = 1;
+	/* If specify match_data, it must match one. When match one, it will not try to match again */
+	repeated AppMatchData match_data = 2;
+	repeated AppNrData nr_data = 3;
+	repeated Range valid_nr_symbs = 4;
+	required uint32 max_nr_cnt = 5;
+	optional AppMatchData logout_match = 6;
+	optional bool multi_login = 7;
+	optional uint32 same_id_cnt = 8;
+	optional bool check_uniq_id = 9;
+}
+
+message ImAuditApp {
+	required uint32 appid = 1;
+	required AppData app_data = 2;
+	required string name = 3;
+	required ImAuditEvt event = 4;
+}
+
+message HttpMatchData {
+	required uint32 dir = 1;
+	repeated uint32 pkt_seq = 2;
+	repeated uint32 port = 3;
+	required uint32 index = 4;
+	required bytes match_str = 5;
+	optional int32 offset = 6 [default = 0];
+	repeated Range port_range = 7;
+	optional ImAuditProto proto = 8;
+	repeated Range fwd_port_range = 9;
+	optional uint32 min_pkt_seq = 10;
+}
+
+message HttpNrData {
+	required uint32 dir = 1;
+	repeated uint32 pkt_seq = 2;
+	repeated uint32 port = 3;
+	required uint32 index = 4;
+	optional bytes prefix_match = 5;
+	optional uint32 prefix_offset = 6;
+	optional int32 match_offset = 7 [default = 0];
+	optional uint32 disc_logout = 8 [default = 0];
+	repeated Range port_range = 9;
+	optional ImAuditProto proto = 10;
+	repeated Range fwd_port_range = 11;
+	optional uint32 min_pkt_seq = 12;
+	optional bool is_uniq_id = 13;
+	optional string id_name = 14;
+	optional bool is_audit_log = 15;
+}
+
+message HttpData {
+	required uint32 max_seq = 1; // Max pkt seq of both dir
+	/* If specify match_data, it must match one. When match one, it will not try to match again */
+	repeated HttpMatchData match_data = 2;
+	repeated HttpNrData nr_data = 3;
+	repeated Range valid_nr_symbs = 4; // Valid NR ranges
+	required uint32 max_nr_cnt = 5; // Max NR count
+	optional HttpMatchData logout_match = 6;
+	optional bool multi_login = 7;
+	optional uint32 same_id_cnt = 8;
+	optional bool check_uniq_id = 9;
+}
+
+message ImAuditHttp {
+	required uint32 appid = 1; // appid match condition
+	required HttpData http_data = 2; 
+	required string name = 3;  // app name
+	required ImAuditEvt event = 4; // event type
+}
+
+message IkAuditData {
+	repeated ImAuditHttp im_http_data = 1; // IM HTTP audit data
+	repeated ImAuditApp im_app_data = 2; // IM APP audit data
+}
+

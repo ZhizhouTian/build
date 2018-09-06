@@ -1,0 +1,10 @@
+message Subnet {
+	required uint32 ip = 1;
+	required uint32 mask = 2;
+}
+
+message GuestModeRules {
+	repeated string ifnames = 1;
+	repeated uint32 ports = 2;
+	repeated Subnet snets = 3;
+}

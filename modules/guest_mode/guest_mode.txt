@@ -1,0 +1,5 @@
+ifnames: "eth0"
+ports: 67
+ports: 53
+snets { ip: 3232261120 mask: 4294967040 }
+snets { ip: 3232235520 mask: 4294967040 }
