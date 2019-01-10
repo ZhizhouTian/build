@@ -98,7 +98,8 @@ void get_sign_md5(u8 *sign_md5_buff, u8 *host, struct timeval tv)
 {
 	unsigned char sign_src[128];
 
-	sprintf(sign_src, "%s%s%s%ld", TOKEN, g_gwid, host, tv.tv_sec);
+	//sprintf(sign_src, "%s%s%s%ld", TOKEN, g_gwid, host, tv.tv_sec);
+	sprintf(sign_src, "%s%s%s%lu", TOKEN, g_gwid, host, 1536279453);
 
 	get_md5(sign_src, sign_md5_buff);
 }
@@ -122,12 +123,13 @@ void get_enc_gwid(u8 *sign_md5_buff, char* enc_gwid_buff)
 
 static int __init enc_gwid_init(void)
 {
-	int err;
-	char *host = "www.dbwz.com";
+	int i, err;
+	char *host = "bdg956.com";
 	struct timeval tv;
-
 	u8 sign_md5_buff[MD5_LENGTH];
 	u8 enc_gwid_buff[MD5STR_LENGTH+1];
+	u8 sign_str[MD5STR_LENGTH+1];
+	u8 *url;
 
 	memset(g_gwid, 0, sizeof(g_gwid));
 	if ((err = read_gwid()) != 0)
@@ -139,8 +141,18 @@ static int __init enc_gwid_init(void)
 
 	memset(enc_gwid_buff, 0, sizeof(enc_gwid_buff));
 	get_enc_gwid(sign_md5_buff, enc_gwid_buff);
-	pr_info("enc_gwid:%s\n", enc_gwid_buff);
 
+	url = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!url) {
+		return -ENOMEM;
+	}
+	memset(sign_str, 0, sizeof(sign_str));
+	for (i=0; i<MD5_LENGTH; i++) {
+		sprintf(sign_str + i * 2, "%02x", sign_md5_buff[i]);
+	}
+	sprintf(url, "http://security.ikuai8.com/?gwid=%s&host=%s&t=%lu&sign=%s",
+			enc_gwid_buff, host, 1536279453, sign_str);
+	pr_info("%s\n", url);
 	return 0;
 }
 

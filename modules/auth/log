@@ -1,0 +1,17 @@
+make -C /home/zz/works/source/linux O=/home/zz/works/source/build/out M=`pwd` modules
+make[1]: Entering directory `/home/zz/works/source/linux'
+make[2]: Entering directory `/home/zz/works/source/build/out'
+  CC [M]  /home/zz/works/source/build/modules/auth/ikbr_host.o
+In file included from /home/zz/works/source/build/modules/auth/ikbr_host.c:6:0:
+/home/zz/works/source/build/modules/auth/hashtable.h:61:13: warning: ‘hashtab_lock_lookup’ defined but not used [-Wunused-function]
+ static void hashtab_lock_lookup(struct hashtab *htp, unsigned long hash)
+             ^
+/home/zz/works/source/build/modules/auth/hashtable.h:66:13: warning: ‘hashtab_unlock_lookup’ defined but not used [-Wunused-function]
+ static void hashtab_unlock_lookup(struct hashtab *htp, unsigned long hash)
+             ^
+  LD [M]  /home/zz/works/source/build/modules/auth/ikbr.o
+  Building modules, stage 2.
+  MODPOST 1 modules
+  LD [M]  /home/zz/works/source/build/modules/auth/ikbr.ko
+make[2]: Leaving directory `/home/zz/works/source/build/out'
+make[1]: Leaving directory `/home/zz/works/source/linux'
